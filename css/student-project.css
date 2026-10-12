@@ -1,0 +1,35 @@
+:root{
+  --ink:#172b38;
+  --muted:#6e7e87;
+  --navy:#214b60;
+  --navy-2:#2a5a70;
+  --violet:#16848b;
+  --paper:#f2f6f3;
+  --line:#dce6e1;
+  --shadow:0 4px 13px rgba(28,58,68,.055);
+}
+body{background-color:var(--paper);background-image:radial-gradient(#dce7e1 .65px,transparent .65px);background-size:18px 18px}
+.sidebar{background:#214b60}
+.brand-mark{background:#f0c15a;border-radius:9px}
+.brand-mark svg{stroke:#214b60}
+.brand-copy strong,.page-heading h1,.metric-value,.panel-title,.readiness-gauge strong,.event-card-banner h3,.attendance-head strong{font-family:"Space Grotesk","DM Sans",sans-serif}
+.nav-link.active{background:#2c5d70;box-shadow:inset 3px 0 #f0c15a}
+.nav-count{background:#375f70;color:#fff0bb}
+.sidebar-help{background:#284f62;border-color:rgba(255,255,255,.13)}
+.help-icon{background:#365f70}
+.topbar{border-bottom-color:#dce6e1}
+.page-heading h1{font-size:24px}
+.metric-card,.panel,.event-card{border-color:#dce6e1;box-shadow:var(--shadow)}
+.metric-card,.panel,.event-card{border-radius:9px}
+.metric-icon{background:#e4f2ee;color:#16848b}
+.event-card-banner{background:#28596d}
+.event-card-banner:after{border-color:rgba(240,193,90,.38);box-shadow:0 0 0 17px rgba(240,193,90,.055),0 0 0 36px rgba(240,193,90,.035)}
+.button-primary{background:#16848b;box-shadow:0 3px 8px rgba(22,132,139,.16)}
+.button-primary:hover{background:#116e75}
+.readiness-box{border-color:#cfe6dc;background:#f1f8f4}
+.storage-pill{background:#fffdf5;border-color:#e8ddb9;color:#665832}
+.storage-pill i{background:#d59c2d}
+.storage-pill.cloud{background:#f0faf5;border-color:#cee8dc;color:#39745d}
+.storage-pill.cloud i{background:#39a87b}
+.app-footer{color:#7f8c8e}
+@media(max-width:760px){.sidebar{background:#214b60}}

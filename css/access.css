@@ -1,0 +1,3 @@
+.nav-link[hidden]{display:none!important}
+.event-card-footer>span[style]{align-items:center;flex-wrap:wrap}
+.overview-grid>*{min-width:0}

@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function roleIs(role) {
+      return signedIn() && request.auth.token.role == role;
+    }
+
+    function eventManager() {
+      return roleIs('Event In-Charge');
+    }
+
+    function studentRecord(studentId) {
+      return get(/databases/$(database)/documents/students/$(studentId)).data;
+    }
+
+    function settingsRecord() {
+      return get(/databases/$(database)/documents/config/settings).data;
+    }
+
+    function lastHistoryMatches(role, status) {
+      let entries = request.resource.data.history;
+      let latest = entries[entries.size() - 1];
+      return latest.actorUid == request.auth.uid
+        && latest.role == role
+        && latest.status == status;
+    }
+
+    function validAttendance(student) {
+      return student.totalClasses is int
+        && student.attendedClasses is int
+        && student.totalClasses > 0
+        && student.attendedClasses >= 0
+        && student.attendedClasses <= student.totalClasses;
+    }
+
+    match /students/{studentId} {
+      allow get, list: if eventManager()
+        || (roleIs('Student') && resource.data.uid == request.auth.uid)
+        || (roleIs('Proctor') && resource.data.proctorUid == request.auth.uid);
+      allow create: if eventManager()
+        && request.resource.data.uid is string
+        && request.resource.data.studentId == studentId
+        && validAttendance(request.resource.data);
+      allow update: if eventManager()
+        && request.resource.data.studentId == studentId
+        && validAttendance(request.resource.data);
+      allow delete: if eventManager();
+    }
+
+    match /events/{eventId} {
+      allow read: if signedIn() && request.auth.token.role in ['Student', 'Proctor', 'Event In-Charge'];
+      allow create, update: if eventManager()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.date is string
+        && request.resource.data.deadline is string
+        && request.resource.data.deadlineEpoch is int
+        && request.resource.data.active is bool;
+      allow delete: if eventManager();
+    }
+
+    match /config/{configId} {
+      allow get: if signedIn() && request.auth.token.role in ['Student', 'Proctor', 'Event In-Charge'];
+      allow list: if eventManager();
+      allow create, update: if eventManager()
+        && configId == 'settings'
+        && request.resource.data.threshold is int
+        && request.resource.data.threshold >= 0
+        && request.resource.data.threshold <= 100;
+      allow delete: if false;
+    }
+
+    match /requests/{requestId} {
+      allow get, list: if eventManager()
+        || (roleIs('Student') && resource.data.studentUid == request.auth.uid)
+        || (roleIs('Proctor') && resource.data.proctorUid == request.auth.uid);
+
+      allow create: if roleIs('Student')
+        && request.resource.data.keys().hasAll(['id', 'studentId', 'studentUid', 'proctorUid', 'eventId', 'reason', 'documentRef', 'status', 'createdAt', 'createdAtMs', 'updatedAt', 'updatedAtMs', 'proctorRemarks', 'finalRemarks', 'history'])
+        && request.resource.data.keys().hasOnly(['id', 'studentId', 'studentUid', 'proctorUid', 'eventId', 'reason', 'documentRef', 'status', 'createdAt', 'createdAtMs', 'updatedAt', 'updatedAtMs', 'proctorRemarks', 'finalRemarks', 'history'])
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentId is string
+        && request.resource.data.proctorUid is string
+        && request.resource.data.eventId is string
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.proctorRemarks == ''
+        && request.resource.data.finalRemarks == ''
+        && request.resource.data.createdAtMs is int
+        && request.resource.data.createdAtMs <= request.time.toMillis()
+        && request.resource.data.createdAtMs >= request.time.toMillis() - 300000
+        && request.resource.data.history is list
+        && request.resource.data.history.size() == 1
+        && lastHistoryMatches('Student', 'Pending')
+        && studentRecord(request.resource.data.studentId).uid == request.auth.uid
+        && studentRecord(request.resource.data.studentId).proctorUid == request.resource.data.proctorUid
+        && validAttendance(studentRecord(request.resource.data.studentId))
+        && studentRecord(request.resource.data.studentId).attendedClasses * 100
+          >= studentRecord(request.resource.data.studentId).totalClasses * settingsRecord().threshold
+        && get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.active == true
+        && get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.deadlineEpoch >= request.time.toMillis();
+
+      allow update: if roleIs('Proctor')
+        && resource.data.status == 'Pending'
+        && resource.data.proctorUid == request.auth.uid
+        && request.resource.data.status in ['Recommended', 'Rejected']
+        && (request.resource.data.status != 'Rejected' || request.resource.data.proctorRemarks is string && request.resource.data.proctorRemarks.size() > 0)
+        && request.resource.data.updatedAtMs is int
+        && request.resource.data.updatedAtMs <= request.time.toMillis()
+        && request.resource.data.updatedAtMs >= request.time.toMillis() - 300000
+        && lastHistoryMatches('Proctor', request.resource.data.status)
+        && request.resource.data.history.hasAll(resource.data.history)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'proctorRemarks', 'history', 'updatedAt', 'updatedAtMs'])
+        && request.resource.data.history.size() == resource.data.history.size() + 1;
+
+      allow update: if eventManager()
+        && resource.data.status == 'Recommended'
+        && request.resource.data.status in ['Approved', 'Rejected']
+        && request.resource.data.finalRemarks is string
+        && request.resource.data.finalRemarks.size() > 0
+        && request.resource.data.updatedAtMs is int
+        && request.resource.data.updatedAtMs <= request.time.toMillis()
+        && request.resource.data.updatedAtMs >= request.time.toMillis() - 300000
+        && lastHistoryMatches('Event In-Charge', request.resource.data.status)
+        && request.resource.data.history.hasAll(resource.data.history)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'finalRemarks', 'history', 'updatedAt', 'updatedAtMs'])
+        && request.resource.data.history.size() == resource.data.history.size() + 1;
+
+      allow delete: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if eventManager()
+        || (roleIs('Student') && resource.data.studentUid == request.auth.uid);
+      allow create: if roleIs('Student')
+          && request.resource.data.studentUid == request.auth.uid
+        || roleIs('Proctor')
+          && studentRecord(request.resource.data.studentId).proctorUid == request.auth.uid
+          && request.resource.data.studentUid == studentRecord(request.resource.data.studentId).uid
+        || eventManager()
+          && request.resource.data.studentUid is string;
+      allow update, delete: if eventManager();
+    }
+  }
+}

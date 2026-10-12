@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*service-account*.json
+*-firebase-adminsdk-*.json
+.runtimeconfig.json
+.DS_Store
+Thumbs.db
